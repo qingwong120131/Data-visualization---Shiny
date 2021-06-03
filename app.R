@@ -7,11 +7,11 @@ library(scales)
 #-----helper function - for building scatter plots with line---------------
 plot_pointswithline <- function(data,x,y,groupby,colorby,shapeby,panelby){
   if (is.null(data)==FALSE)
-  p <- ggplot(data,aes_string(as.name(x),as.name(y),group=groupby,color=as.name(colorby),shape=as.name(shapeby))) +
+  p <- ggplot(data,aes_string(as.name(x),as.name(y),group=groupby,color=if(colorby!="None") colorby,shape=if(shapeby!="None") shapeby)) +
     geom_point(size = 3) +
     theme(text = element_text(size = 20),plot.title = element_text(hjust = 0.5))+
     ggtitle(paste0(as.name(y)," vs. ",as.name(x)))+
-    facet_grid(~get(panelby))+
+    facet_grid(if (panelby!="None") ~get(panelby))+
     guides(colour = guide_legend(order = 1), 
            shape = guide_legend(order = 2))
   if(groupby=='combined_line') p <- p + geom_line()
@@ -156,7 +156,7 @@ server <- function(input, output, session) {
     selectInput(
       inputId = "color",
       label = "Color by:",
-      choices = c(colnames(df()))
+      choices = c("None",colnames(df()))
     )
   })
   
@@ -164,7 +164,7 @@ server <- function(input, output, session) {
     selectInput(
       inputId = "shape",
       label = "Shape by:",
-      choices = c(colnames(df()))
+      choices = c("None",colnames(df()))
     )
   })
   
@@ -172,7 +172,7 @@ server <- function(input, output, session) {
     selectInput(
       inputId = "panel",
       label = "Panel by:",
-      choices = c(colnames(df()))
+      choices = c("None",colnames(df()))
     )
   })
   
