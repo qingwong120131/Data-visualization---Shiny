@@ -3,6 +3,7 @@ library(readxl)
 library(ggplot2)
 library(tidyverse)
 library(scales)
+library(shinyjs)
 
 #-----helper function - for building scatter plots with line---------------
 plot_pointswithline <- function(data,x,y,groupby,colorby,shapeby,panelby){
@@ -20,6 +21,7 @@ plot_pointswithline <- function(data,x,y,groupby,colorby,shapeby,panelby){
 
 # User interface ----
 ui <- fluidPage(
+  useShinyjs(),
   sidebarLayout(
     sidebarPanel(
       actionButton(
@@ -33,7 +35,7 @@ ui <- fluidPage(
       ),
       br(),
       br(),
-      selectInput(inputId = "selectinput_sheet",
+      selectInput(inputId = "select_sheet",
                   label = "Select sheet",
                   choices = NULL),
       selectInput(
@@ -165,9 +167,9 @@ server <- function(input, output, session) {
     return(dfs)
   })
   
-  # output$selectinput_sheet <- renderUI({
+  # output$select_sheet <- renderUI({
   #   selectInput(
-  #     inputId = "selectinput_sheet",
+  #     inputId = "select_sheet",
   #     label = "Select sheet",
   #     choices = names(data())
   #   )
@@ -177,15 +179,22 @@ server <- function(input, output, session) {
   current_inputs <- eventReactive(input$save,AllInputs())
   #when restore button is hit, change AllInputs to the last saved inputs
   observeEvent(input$restore,{
-    lapply(names(input), function(i) {
-      if (grepl("selectinput",i,fixed=TRUE)) {
-        updateSelectInput(
-          session,
-          inputId = i,
-          selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == i))[["V2"]]
-        )
-      }
-    })
+    updateSelectInput(
+      session,
+      inputId = "select_sheet",
+      selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == "select_sheet"))[["V2"]]
+    )
+    delay(100,
+          lapply(names(input), function(i) {
+            if (grepl("selectinput",i,fixed=TRUE)) {
+              updateSelectInput(
+                session,
+                inputId = i,
+                selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == i))[["V2"]]
+              )
+            }
+          })
+          )
   })
   # for (i in names(input)) 
   #   if (grepl("selectinput",i,fixed=TRUE)) {print(i)
@@ -232,12 +241,13 @@ server <- function(input, output, session) {
   
   #Then waits for user to select a sheet
   observeEvent(input$reload,{
-    updateSelectInput(
-    inputId = "selectinput_sheet",
-    label = "Select sheet",
-    choices = names(data())
-    )
+      updateSelectInput(
+        inputId = "select_sheet",
+        label = "Select sheet",
+        choices = names(data())
+      )
   })
+  
   observe({
     updateSelectInput(
       inputId = "selectinput_x",
@@ -280,9 +290,9 @@ server <- function(input, output, session) {
       choices = c("None",colnames(df()))
     )
   })
-  # output$selectinput_sheet <- renderUI({
+  # output$select_sheet <- renderUI({
   #   selectInput(
-  #     inputId = "selectinput_sheet",
+  #     inputId = "select_sheet",
   #     label = "Select sheet",
   #     choices = names(data())
   #   )
@@ -297,7 +307,7 @@ server <- function(input, output, session) {
   
   df <- reactive({
     if (is.null(data()) == FALSE)
-      data()[[input$selectinput_sheet]]
+      data()[[input$select_sheet]]
   })
   
   #---Input boxes for selecting axes--------
