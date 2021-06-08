@@ -231,12 +231,14 @@ server <- function(input, output, session) {
   
   
   #Then waits for user to select a sheet
-  observe({
+  observeEvent(input$reload,{
     updateSelectInput(
-          inputId = "selectinput_sheet",
-          label = "Select sheet",
-          choices = names(data())
-        )
+    inputId = "selectinput_sheet",
+    label = "Select sheet",
+    choices = names(data())
+    )
+  })
+  observe({
     updateSelectInput(
       inputId = "selectinput_x",
       label = "Select x-axis:",
@@ -295,8 +297,7 @@ server <- function(input, output, session) {
   
   df <- reactive({
     if (is.null(data()) == FALSE)
-      data()[[1]]
-      # data()[[input$selectinput_sheet]]
+      data()[[input$selectinput_sheet]]
   })
   
   #---Input boxes for selecting axes--------
