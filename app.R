@@ -33,10 +33,9 @@ ui <- fluidPage(
       ),
       br(),
       br(),
-      selectInput(
-        inputId = "selectinput_sheet",
-        label = "Select sheet:",
-        choices = NULL),
+      selectInput(inputId = "selectinput_sheet",
+                  label = "Select sheet",
+                  choices = NULL),
       selectInput(
         inputId = "selectinput_x",
         label = "Select x-axis:",
@@ -159,17 +158,20 @@ server <- function(input, output, session) {
     filepath <<- file.choose()
     sheetnames <<- excel_sheets(filepath)
   })
-  observe({
-    dfs <- lapply(sheetnames, function(x) read_excel(filepath,sheet=x))
-    names(dfs) <- sheetnames
-    return(dfs)
-  })
   
   data <- eventReactive(input$reload, {
     dfs <- lapply(sheetnames, function(x) read_excel(filepath,sheet=x))
     names(dfs) <- sheetnames
     return(dfs)
   })
+  
+  # output$selectinput_sheet <- renderUI({
+  #   selectInput(
+  #     inputId = "selectinput_sheet",
+  #     label = "Select sheet",
+  #     choices = names(data())
+  #   )
+  # })
   
   #when the save button is hit, store input values as they currently are
   current_inputs <- eventReactive(input$save,AllInputs())
@@ -231,10 +233,10 @@ server <- function(input, output, session) {
   #Then waits for user to select a sheet
   observe({
     updateSelectInput(
-      inputId = "selectinput_sheet",
-      label = "Select sheet",
-      choices = names(data())
-    )
+          inputId = "selectinput_sheet",
+          label = "Select sheet",
+          choices = names(data())
+        )
     updateSelectInput(
       inputId = "selectinput_x",
       label = "Select x-axis:",
@@ -293,7 +295,8 @@ server <- function(input, output, session) {
   
   df <- reactive({
     if (is.null(data()) == FALSE)
-      data()[[input$selectinput_sheet]]
+      data()[[1]]
+      # data()[[input$selectinput_sheet]]
   })
   
   #---Input boxes for selecting axes--------
