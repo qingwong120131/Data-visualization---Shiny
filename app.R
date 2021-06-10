@@ -97,7 +97,7 @@ ui <- fluidPage(
     mainPanel(
       br(),
       tabsetPanel(
-        tabPanel("Plot", br(), plotOutput(outputId = "scatter")),
+        tabPanel("Plot", actionButton(inputId = "refresh",label = "Go"), plotOutput(outputId = "scatter")),
         tabPanel("Table", tableOutput(outputId = "table"))
       )
     )
@@ -149,6 +149,8 @@ ui <- fluidPage(
 # Server logic ----
 server <- function(input, output, session) {
   
+  
+  
   #---------DATA SHEET IMPORT----------------------------------------------------------------------
   
   # First returns a list of dataframes corresponding to each sheet in the excel file
@@ -167,14 +169,6 @@ server <- function(input, output, session) {
     return(dfs)
   })
   
-  # output$select_sheet <- renderUI({
-  #   selectInput(
-  #     inputId = "select_sheet",
-  #     label = "Select sheet",
-  #     choices = names(data())
-  #   )
-  # })
-  
   #when the save button is hit, store input values as they currently are
   current_inputs <- eventReactive(input$save,AllInputs())
   #when restore button is hit, change AllInputs to the last saved inputs
@@ -184,7 +178,7 @@ server <- function(input, output, session) {
       inputId = "select_sheet",
       selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == "select_sheet"))[["V2"]]
     )
-    delay(100,
+    delay(500,
           lapply(names(input), function(i) {
             if (grepl("selectinput",i,fixed=TRUE)) {
               updateSelectInput(
@@ -193,51 +187,41 @@ server <- function(input, output, session) {
                 selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == i))[["V2"]]
               )
             }
-          })
+              if (grepl("filter",i,fixed=TRUE)) {
+                updateSelectInput(
+                  session,
+                  inputId = i,
+                  selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == i))[["V2"]]
+                )
+              }
+              # if (grepl("options",i,fixed=TRUE)) {
+              #   updateCheckboxGroupInput(
+              #     session,
+              #     inputId = i,
+              #     #choices = na.omit(unique(filter_values(i,new_df())[[input[[paste0("filter",i)]]]])),
+              #     selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == i))[["V2"]],
+              #   )
+              # }
+            }
           )
+    )
   })
-  # for (i in names(input)) 
-  #   if (grepl("selectinput",i,fixed=TRUE)) {print(i)
-  #       updateSelectInput(
-  #         session,
-  #         inputId = i,
-  #         selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == i))[["V2"]]
-  #       )}
-  #     })
-  # if (grepl("selectinput",i,fixed=TRUE)) {print(i)
-  #   updateSelectInput(
-  #     session,
-  #     inputId = i,
-  #     selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == i))[["V2"]]
-  #   )}
-  # })
   
-  # updateSelectInput(
-  #   session,
-  #   inputId = "y",
-  #   label = "Select y-axis",
-  #   choices = colnames(df()),
-  #   selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == "y"))[["V2"]]
-  # )
-  
-  # observeEvent(input$x,{
-  #   print(filepath)
-  #   print(sheetnames)
-  #   dfs <- lapply(sheetnames, function(x) read_excel(filepath,sheet=x))
-  #   names(dfs) <- sheetnames
-  #   return(dfs)
-  # })
-  
-  # 
-  # if (is.null(input$sourcefile)) {
-  #   return(NULL)
-  # }
-  # file <- input$sourcefile
-  # sheetnames <- excel_sheets(file$datapath)
-  # dfs <- lapply(sheetnames,function(x) read_excel(file$datapath,sheet = x))
-  # names(dfs) <- sheetnames
-  # return(dfs)
-  
+  observeEvent(input$restore,{
+    delay(1000,
+          lapply(names(input), function(i) {
+            if (grepl("options",i,fixed=TRUE)) {
+              updateCheckboxGroupInput(
+                session,
+                inputId = i,
+                #choices = na.omit(unique(filter_values(i,new_df())[[input[[paste0("filter",i)]]]])),
+                selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == i))[["V2"]],
+              )
+            }
+          }
+          )
+    )
+  })
   
   #Then waits for user to select a sheet
   observeEvent(input$reload,{
@@ -248,6 +232,7 @@ server <- function(input, output, session) {
       )
   })
   
+  #---Input boxes for selecting axes--------
   observe({
     updateSelectInput(
       inputId = "selectinput_x",
@@ -290,29 +275,13 @@ server <- function(input, output, session) {
       choices = c("None",colnames(df()))
     )
   })
-  # output$select_sheet <- renderUI({
-  #   selectInput(
-  #     inputId = "select_sheet",
-  #     label = "Select sheet",
-  #     choices = names(data())
-  #   )
-  # })
   
-  #Assigns user-selected sheet as df and replaces empty values
-  # df <- eventReactive(input$reload, {
-  #   if (is.null(data()) == FALSE)
-  #     data()[[input$select_sheet]] %>%
-  #     mutate(across(where(is.character),function(x) ifelse(is.na(x),"N/A",x)))
-  # })
+  #-------------DF() AND NEW_DF(): dataframes generated from selecting a sheet as well as multiple lineby (might be obsolete)  ----------------------------------------------------
   
   df <- reactive({
     if (is.null(data()) == FALSE)
       data()[[input$select_sheet]]
   })
-  
-  #---Input boxes for selecting axes--------
-  
-  
   
   new_df <- reactive({
     if (input$selectinput_line1 == "None" & input$selectinput_line2 == "None" & input$selectinput_line3 == "None") {
@@ -341,6 +310,7 @@ server <- function(input, output, session) {
   
   observeEvent(input$add_btn, {
     counter$n <- counter$n + 1
+    
   })
   observeEvent(input$rm_btn, {
     if (counter$n > 0) counter$n <- counter$n - 1
@@ -366,28 +336,16 @@ server <- function(input, output, session) {
   
   #---------VALUES FOR FILTER CHECKBOX---------------------------------------------------------------------------
   
-  #   df_for_values <- reactive({
-  #     n <- counter$n
-  #     test <- new_df()
-  #     if (n > 1) {
-  #      for (i in c(2:n)) {
-  #      test <- test %>% filter(test[[input[[paste0("filter",i-1)]]]] %in% input[[paste0("options",i-1)]])
-  #      }
-  #     }
-  #     #test[[input[[paste0("filter",1)]]]] <- df()[[input[[paste0("filter",1)]]]]
-  #     return(test)
-  # })
-  
   #Helper function - loops through all filters and filters new_df by them all-----
-  filter_values <- function(n) {
-    test <- new_df()
+  filter_values <- function(n,df) {
+    # test <- new_df()
     if (n > 1) {
       for (i in c(2:n)) {
-        test <- test %>% filter(test[[input[[paste0("filter",i-1)]]]] %in% input[[paste0("options",i-1)]])
+        df <- df %>% filter(df[[input[[paste0("filter",i-1)]]]] %in% input[[paste0("options",i-1)]])
       }
     }
     #test[[input[[paste0("filter",1)]]]] <- df()[[input[[paste0("filter",1)]]]]
-    return(test)
+    return(df)
   }
   
   values <- reactive({
@@ -403,7 +361,7 @@ server <- function(input, output, session) {
             # }
             # else if (i > 1) {
             #if (i > 1) {
-            na.omit(unique(filter_values(i)[[input[[paste0("filter",i)]]]]))
+            na.omit(unique(filter_values(i,new_df())[[input[[paste0("filter",i)]]]]))
             #na.omit(unique(filter(new_df(),new_df()[[input[[paste0("filter",i-1)]]]] %in% input[[paste0("options",i-1)]])[[input[[paste0("filter",i)]]]]))
             #}
             #else {
@@ -412,16 +370,15 @@ server <- function(input, output, session) {
           },
           selected = {
             if (is.null(input[[paste0("options",i)]]) == TRUE & input[[paste0("deselect_all",i)]]==0)
-              na.omit(unique(filter_values(i)[[input[[paste0("filter",i)]]]]))
+              na.omit(unique(filter_values(i,new_df())[[input[[paste0("filter",i)]]]]))
             else
               (AllInputs() %>% filter(AllInputs()[["V1"]] == paste0("options",i)))[["V2"]]
           }
         )
       })
     }
-    
   })
-  
+
   #---------SELECT ALL AND DESELECT ALL BUTTONS---------------------------------------------------------------------------
   
   select_all <- reactive({
@@ -459,9 +416,9 @@ server <- function(input, output, session) {
           session,
           inputId = paste0("options",n),
           #choices = na.omit(unique(df_for_values()[[input[[paste0("filter",n)]]]])),
-          choices = na.omit(unique(filter_values(n)[[input[[paste0("filter",n)]]]])),
+          choices = na.omit(unique(filter_values(n,new_df())[[input[[paste0("filter",n)]]]])),
           #that gives you a vector with the selected values of the preceding filter
-          selected = na.omit(unique(filter_values(n)[[input[[paste0("filter",n)]]]]))
+          selected = na.omit(unique(filter_values(n,new_df())[[input[[paste0("filter",n)]]]]))
         ))
       })
     }
@@ -476,7 +433,7 @@ server <- function(input, output, session) {
         observeEvent(input[[x]],updateCheckboxGroupInput(
           session, 
           inputId = paste0("options",n),
-          choices = na.omit(unique(filter_values(n)[[input[[paste0("filter",n)]]]])),
+          choices = na.omit(unique(filter_values(n,new_df())[[input[[paste0("filter",n)]]]])),
           #filter(df(), df()[[input[[paste0("filter",n-1)]]]] == input[[paste0("options",n-1)]])[[input[[paste0("filter",n)]]]]
           selected = NULL
         ))
@@ -543,34 +500,36 @@ server <- function(input, output, session) {
     y_max_def <- ggplot_build(plt)$layout$panel_params[[1]]$y.range[[2]]
     list(x_min_def,x_max_def,y_min_def,y_max_def)
   }
-  
+
   output$scatter <- renderPlot({
-    if (is.null(new_df()[['combined_line']]) == FALSE) 
-      p <- plot_pointswithline(data = filtered_data(), x = input$selectinput_x, y = input$selectinput_y,groupby="combined_line",colorby=input$selectinput_color,shapeby=input$selectinput_shape,panelby=input$selectinput_panel)
-    else
-      p<- plot_pointswithline(data = filtered_data(), x = input$selectinput_x, y = input$selectinput_y,groupby="NULL",colorby=input$selectinput_color,shapeby=input$selectinput_shape,panelby=input$selectinput_panel)
-    
-    if (input$x_min!="") x_min <- as.numeric(input$x_min)
-    else x_min <- default_ranges(p)[[1]]
-    if (input$x_max!="") x_max <- as.numeric(input$x_max)
-    else x_max <- default_ranges(p)[[2]]
-    if (input$y_min!="") y_min <- as.numeric(input$y_min)
-    else y_min <- default_ranges(p)[[3]]
-    if (input$y_max!="") y_max <- as.numeric(input$y_max)
-    else y_max <- default_ranges(p)[[4]]
-    
-    p <- p+coord_cartesian(xlim = c(x_min,x_max),ylim=c(y_min,y_max))
-    
-    if (is.numeric(filtered_data()[[input$selectinput_x]]) == TRUE)
-      p <- p + scale_x_continuous(breaks = scales::pretty_breaks(n = 10))
-    if (is.numeric(filtered_data()[[input$selectinput_y]]) == TRUE)
-      p <- p + scale_y_continuous(breaks = scales::pretty_breaks(n = 10))
-    
-    return(p)
-  })
+    req(input$refresh)
+    isolate({
+      if (is.null(new_df()[['combined_line']]) == FALSE)
+        p <- plot_pointswithline(data = isolate(filtered_data()), x = isolate(input$selectinput_x), y = isolate(input$selectinput_y),groupby="combined_line",colorby=isolate(input$selectinput_color),shapeby=isolate(input$selectinput_shape),panelby=isolate(input$selectinput_panel))
+      else
+        p<- plot_pointswithline(data = isolate(filtered_data()), x = isolate(input$selectinput_x), y = isolate(input$selectinput_y),groupby="NULL",colorby=isolate(input$selectinput_color),shapeby=isolate(input$selectinput_shape),panelby=isolate(input$selectinput_panel))
+      
+      if (input$x_min!="") x_min <- as.numeric(input$x_min)
+      else x_min <- default_ranges(p)[[1]]
+      if (input$x_max!="") x_max <- as.numeric(input$x_max)
+      else x_max <- default_ranges(p)[[2]]
+      if (input$y_min!="") y_min <- as.numeric(input$y_min)
+      else y_min <- default_ranges(p)[[3]]
+      if (input$y_max!="") y_max <- as.numeric(input$y_max)
+      else y_max <- default_ranges(p)[[4]]
+      
+      p <- p+coord_cartesian(xlim = c(x_min,x_max),ylim=c(y_min,y_max))
+      
+      if (is.numeric(filtered_data()[[input$selectinput_x]]) == TRUE)
+        p <- p + scale_x_continuous(breaks = scales::pretty_breaks(n = 10))
+      if (is.numeric(filtered_data()[[input$selectinput_y]]) == TRUE)
+        p <- p + scale_y_continuous(breaks = scales::pretty_breaks(n = 10))
+      return(p)
+      }
+      )
+      })
   
-  
-  
+
   output$table <- renderTable({
     filtered_data()
   })
@@ -583,10 +542,6 @@ server <- function(input, output, session) {
   output$show_inputs2 <- renderTable({
     current_inputs()
   })
-  
-  # output$lastselect <- renderTable({
-  #   df_for_values()
-  # })
   
   output$filters <- renderUI({
     if (is.null(filters())==FALSE)
