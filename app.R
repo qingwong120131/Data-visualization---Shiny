@@ -5,6 +5,8 @@ library(tidyverse)
 library(scales)
 library(shinyjs)
 
+#----QW 6/13/21 - WORKING VERSION RIGHT NOW----
+
 #-----helper function - for building scatter plots with line---------------
 plot_pointswithline <- function(data,x,y,groupby,colorby,shapeby,panelby){
   if (is.null(data)==FALSE)
