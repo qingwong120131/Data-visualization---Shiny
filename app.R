@@ -17,7 +17,7 @@ plot_pointswithline <- function(data,x,y,groupby,colorby,shapeby,panelby){
       facet_grid(if (panelby!="None") ~get(panelby))+
       guides(colour = guide_legend(order = 1), 
              shape = guide_legend(order = 2))
-  if(groupby=='combined_line') p <- p + geom_line()
+  if(groupby=='combined_line') p <- p + geom_line(data=data[!is.na(data[[as.name(y)]]),])
   return(p)
 }
 
