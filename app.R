@@ -1,18 +1,27 @@
 library(shiny)
 library(readxl)
 library(ggplot2)
+library(ggprism)
+library(ggthemes)
 library(tidyverse)
 library(scales)
 library(shinyjs)
 
-#----QW 6/13/21 - WORKING VERSION RIGHT NOW----
+#----QW 7/21/21 - USING PRISM THEME ----
 
 #-----helper function - for building scatter plots with line---------------
 plot_pointswithline <- function(data,x,y,groupby,colorby,shapeby,panelby){
   if (is.null(data)==FALSE)
     p <- ggplot(data,aes_string(as.name(x),as.name(y),group=groupby,color=if(colorby!="None") as.name(colorby),shape=if(shapeby!="None") as.name(shapeby))) +
-      geom_point(size = 3) +
-      theme(text = element_text(size = 20),plot.title = element_text(hjust = 0.5))+
+      geom_point(size = 5) +
+      theme_prism(
+        palette = "black_and_white",
+        base_size = 20
+      ) +
+      theme(legend.position = "right") +
+      #theme(text = element_text(size = 20),
+            #plot.title = element_text(hjust = 0.5), 
+            #panel.background = element_rect(fill = "lightblue", colour = "white", size = 0.5, linetype = "solid"))+
       ggtitle(paste0(as.name(y)," vs. ",as.name(x)))+
       facet_grid(if (panelby!="None") ~get(panelby))+
       guides(colour = guide_legend(order = 1), 
@@ -99,6 +108,18 @@ ui <- fluidPage(
     mainPanel(
       br(),
       tabsetPanel(
+        # tabPanel("Growth", actionButton(inputId = "refresh",label = "Go"),
+        #          fluidRow(12,
+        #                   column(4,plotOutput(outputId = "vcd_plot")),
+        #                   column(4,plotOutput(outputId = "vcd_plot")),
+        #                   column(4,plotOutput(outputId = "vcd_plot"))
+        #          ),
+        #          # fluidRow(12,
+        #          #          column(6,plotOutput(outputId = "gluc_plot")),
+        #          #          column(6,plotOutput(outputId = "lac_plot")),
+        #          #          #column(4,plotOutput(outputId = "foldexp_plot"))
+        #          # )
+        # ),
         tabPanel("Plot", actionButton(inputId = "refresh",label = "Go"), plotOutput(outputId = "scatter")),
         tabPanel("Table", tableOutput(outputId = "table"))
       )
@@ -531,6 +552,34 @@ server <- function(input, output, session) {
       )
       })
   
+  # output$vcd_plot <- renderPlot({
+  #   req(input$refresh)
+  #   isolate({
+  #     if (is.null(new_df()[['combined_line']]) == FALSE)
+  #       p <- plot_pointswithline(data = isolate(filtered_data()), x = isolate(input$selectinput_x), y = "Viable Count (e6/mL)",groupby="combined_line",colorby=isolate(input$selectinput_color),shapeby=isolate(input$selectinput_shape),panelby=isolate(input$selectinput_panel))
+  #     else
+  #       p<- plot_pointswithline(data = isolate(filtered_data()), x = isolate(input$selectinput_x), y = "Viable Count (e6/mL)",groupby="NULL",colorby=isolate(input$selectinput_color),shapeby=isolate(input$selectinput_shape),panelby=isolate(input$selectinput_panel))
+  #     # 
+  #     # if (input$x_min!="") x_min <- as.numeric(input$x_min)
+  #     # else x_min <- default_ranges(p)[[1]]
+  #     # if (input$x_max!="") x_max <- as.numeric(input$x_max)
+  #     # else x_max <- default_ranges(p)[[2]]
+  #     # if (input$y_min!="") y_min <- as.numeric(input$y_min)
+  #     # else y_min <- default_ranges(p)[[3]]
+  #     # if (input$y_max!="") y_max <- as.numeric(input$y_max)
+  #     # else y_max <- default_ranges(p)[[4]]
+  #     
+  #     # p <- p+coord_cartesian(xlim = c(x_min,x_max),ylim=c(y_min,y_max))
+  #     # 
+  #     # if (is.numeric(filtered_data()[[input$selectinput_x]]) == TRUE)
+  #     #   p <- p + scale_x_continuous(breaks = scales::pretty_breaks(n = 10))
+  #     # if (is.numeric(filtered_data()[[input$selectinput_y]]) == TRUE)
+  #     #   p <- p + scale_y_continuous(breaks = scales::pretty_breaks(n = 10))
+  #     # return(p)
+  #   }
+  #   )
+  # })
+  # 
 
   output$table <- renderTable({
     filtered_data()
