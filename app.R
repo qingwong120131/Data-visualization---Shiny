@@ -24,9 +24,6 @@ plot_pointswithline <- function(data,x,y,groupby,colorby,shapeby,panelby){
         base_size = 16
       ) +
       theme(legend.position = "right") +
-      #theme(text = element_text(size = 20),
-      #plot.title = element_text(hjust = 0.5), 
-      #panel.background = element_rect(fill = "lightblue", colour = "white", size = 0.5, linetype = "solid"))+
       ggtitle(paste0(as.name(y)," vs. ",as.name(x)))+
       facet_grid(if (panelby!="None") ~get(panelby))+
       guides(colour = guide_legend(order = 1), 
@@ -70,15 +67,6 @@ ui <- fluidPage(
       ),
       br(),
       
-      
-      # actionButton(
-      #     inputId = "save",
-      #     label = "Save inputs"
-      # ),
-      # actionButton(
-      #     inputId = "restore",
-      #     label = "Restore inputs"
-      # ),
       actionButton(inputId = "refresh",icon = icon("angry"),label = "Refresh Plot",class = "btn-success"),
       br(),
       br(),
@@ -210,16 +198,8 @@ server <- function(input, output, session) {
   
   # First returns a list of dataframes corresponding to each sheet in the excel file
   
-  # observeEvent(input$browse, {
-  #     filepath <<- file.choose()
-  #     sheetnames <<- excel_sheets(filepath)
-  # })
-  # # 
   
   wb <- reactiveVal()    
-  #df <- reactiveVal()
-  #new_df <- reactiveVal()
-  #filtered_data <- reactiveVal()
   
   observeEvent(input$browse,{
     filepath <<- file.choose()
@@ -227,12 +207,7 @@ server <- function(input, output, session) {
     dfs <- lapply(sheetnames, function(x) read_excel(filepath,sheet=x))
     names(dfs) <- sheetnames
     wb(dfs)
-    
-    
-    #print(is.null(wb()))
-    #return(dfs)
   })
-  
   # #Then waits for user to select a sheet
   
   observe({
@@ -263,25 +238,7 @@ server <- function(input, output, session) {
     }
     return(df)
   })
-  # 
-  # observe({
-  #     if (is.null(wb()) == FALSE) {
-  #         df <- wb()[[input$select_sheet]]
-  #         if (any(df[1,] %in% c("Character","Numeric","Integer")) == TRUE){
-  #             for (i in c(1:ncol(df))){
-  #                 if (df[[1,i]] == "Integer")
-  #                     df[[i]] =  as.integer(df[[i]])
-  #                 else if (df[[1,i]] == "Character")
-  #                     df[[i]] =  as.character(df[[i]])
-  #                 else if (df[[1,i]] == "Numeric")
-  #                     df[[i]] =  as.numeric(df[[i]])
-  #             }
-  #         }
-  #         df <- df[-1,]
-  #     }
-  #     df(df)
-  # })
-  #     
+  
   new_df <- reactive({
     if (input$selectinput_line1 == "None" & input$selectinput_line2 == "None" & input$selectinput_line3 == "None") {
       return(df())
@@ -296,15 +253,10 @@ server <- function(input, output, session) {
   #when the save button is hit, store input values as they currently are
   current_inputs <- eventReactive(input$reload,isolate(AllInputs()))
   
-  
-  #observeEvent(input$reload,print(str(current_inputs())))
   observeEvent(input$reload,{
-    #print(str(workbook()))
-    #current_inputs <- isolate(AllInputs())
     dfs <- lapply(sheetnames, function(x) read_excel(filepath,sheet=x))
     names(dfs) <- sheetnames
     wb(dfs)
-    #print(filter(current_inputs(),current_inputs()[["V1"]]=="select_sheet")[["V2"]])
     delay(100,
           updateSelectInput(
             session,
@@ -312,7 +264,6 @@ server <- function(input, output, session) {
             selected = filter(current_inputs(),current_inputs()[["V1"]]=="select_sheet")[["V2"]]
           )
     )
-    
   })
   
   observeEvent(input$reload, {
@@ -461,17 +412,7 @@ server <- function(input, output, session) {
           inputId = paste0("options",i),
           label = "Values",
           choices = {
-            # if (i==n) {
-            #   na.omit(unique(df_for_values()[[input[[paste0("filter",i)]]]]))
-            # }
-            # else if (i > 1) {
-            #if (i > 1) {
             na.omit(unique(filter_values(i,new_df())[[input[[paste0("filter",i)]]]]))
-            #na.omit(unique(filter(new_df(),new_df()[[input[[paste0("filter",i-1)]]]] %in% input[[paste0("options",i-1)]])[[input[[paste0("filter",i)]]]]))
-            #}
-            #else {
-            #na.omit(unique(new_df()[[input[[paste0("filter",i)]]]]))              
-            #}
           },
           selected = {
             if (is.null(input[[paste0("options",i)]]) == TRUE & input[[paste0("deselect_all",i)]]==0)
@@ -520,7 +461,6 @@ server <- function(input, output, session) {
         observeEvent(input[[x]],updateCheckboxGroupInput(
           session,
           inputId = paste0("options",n),
-          #choices = na.omit(unique(df_for_values()[[input[[paste0("filter",n)]]]])),
           choices = na.omit(unique(filter_values(n,new_df())[[input[[paste0("filter",n)]]]])),
           #that gives you a vector with the selected values of the preceding filter
           selected = na.omit(unique(filter_values(n,new_df())[[input[[paste0("filter",n)]]]]))
@@ -539,7 +479,6 @@ server <- function(input, output, session) {
           session, 
           inputId = paste0("options",n),
           choices = na.omit(unique(filter_values(n,new_df())[[input[[paste0("filter",n)]]]])),
-          #filter(df(), df()[[input[[paste0("filter",n-1)]]]] == input[[paste0("options",n-1)]])[[input[[paste0("filter",n)]]]]
           selected = NULL
         ))
       })
@@ -708,30 +647,14 @@ server <- function(input, output, session) {
     })
   })
   
-  # lapply(seq_len(length(list_of_plots)), function(i)
-  #   output[[names(list_of_plots)[[i]]]] <- renderPlot({
-  #     req(input$refresh)
-  #     isolate({
-  #       if (is.null(new_df()[['combined_line']]) == FALSE)
-  #         p <- plot_pointswithline(data = isolate(filtered_data()), x = "Day", y = list_of_plots[[i]], groupby="combined_line",colorby=isolate(input$selectinput_color),shapeby=isolate(input$selectinput_shape),panelby=isolate(input$selectinput_panel))
-  #       else
-  #         p<- plot_pointswithline(data = isolate(filtered_data()), x = "Day", y = list_of_plots[[i]], groupby="NULL",colorby=isolate(input$selectinput_color),shapeby=isolate(input$selectinput_shape),panelby=isolate(input$selectinput_panel))
-  #       p <- p + scale_x_continuous(breaks = scales::pretty_breaks(n = 10))
-  #       p <- p + scale_y_continuous(breaks = scales::pretty_breaks(n = 10))
-  #       return(p)
-  #     })
-  #   })
-  # )
   
   
   output$table <- renderTable({
-    
     filtered_data()
   })
   
   output$show_inputs <- renderTable({
     AllInputs()
-    #default_ranges(plot_pointswithline(data = filtered_data(), x = input$x, y = input$y,groupby="combined_line",colorby=input$color))
   })
   
   output$show_inputs2 <- renderTable({
