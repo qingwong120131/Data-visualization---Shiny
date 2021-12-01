@@ -12,6 +12,7 @@ library(ggpubr)
 
 #----QW 08/16/21 SHOWING TONS OF DATA WITH TABS
 #----QW 11/27/21 QOL changes
+#----QW 12/1/21 removed multi-step data refresh
 
 #-----helper function - for building scatter plots with line---------------
 plot_pointswithline <- function(data,x,y,groupby,colorby,shapeby,panelby){
@@ -24,8 +25,8 @@ plot_pointswithline <- function(data,x,y,groupby,colorby,shapeby,panelby){
       ) +
       theme(legend.position = "right") +
       #theme(text = element_text(size = 20),
-            #plot.title = element_text(hjust = 0.5), 
-            #panel.background = element_rect(fill = "lightblue", colour = "white", size = 0.5, linetype = "solid"))+
+      #plot.title = element_text(hjust = 0.5), 
+      #panel.background = element_rect(fill = "lightblue", colour = "white", size = 0.5, linetype = "solid"))+
       ggtitle(paste0(as.name(y)," vs. ",as.name(x)))+
       facet_grid(if (panelby!="None") ~get(panelby))+
       guides(colour = guide_legend(order = 1), 
@@ -52,36 +53,36 @@ ui <- fluidPage(
     sidebarPanel(
       width = 2,
       
-               actionButton(
-                 inputId = "load",
-                 label = "Browse data (.xlsx)",
-                 #width = "75%"
-               
-               ),
+      actionButton(
+        inputId = "browse",
+        label = "Browse data (.xlsx)",
+        #width = "75%"
         
-               actionButton(
-                 inputId = "reload",
-                 #icon("paper-plane"),
-                 label = "Load selected file",
-                 #width = "25%"
-               ),
-               
-     
+      ),
+      br(),
       
-      br(),
-      br(),
-
+      
       actionButton(
-        inputId = "save",
-        label = "Save inputs"
+        inputId = "reload",
+        icon = icon("refresh"),
+        label = "Reload data",
+        #width = "25%"
       ),
-      actionButton(
-        inputId = "restore",
-        label = "Restore inputs"
-      ),
-      actionButton(inputId = "refresh",icon = icon("refresh"),label = "Refresh Plot"),
+      br(),
+      
+      
+      # actionButton(
+      #     inputId = "save",
+      #     label = "Save inputs"
+      # ),
+      # actionButton(
+      #     inputId = "restore",
+      #     label = "Restore inputs"
+      # ),
+      actionButton(inputId = "refresh",icon = icon("angry"),label = "Refresh Plot",class = "btn-success"),
       br(),
       br(),
+      
       
       selectInput(inputId = "select_sheet",
                   label = "Select sheet",
@@ -170,17 +171,17 @@ ui <- fluidPage(
                    ),
                    column(9,plotOutput(outputId = "scatter"
                                        #height="800px"
-                                       ))
-                  )
-                 ),
+                   ))
+                 )
+        ),
         tabPanel("BR Growth",
-
+                 
                  plotOutput('growth',height="600px", width = "100%")),
         tabPanel("BR Metabolites",
-
+                 
                  plotOutput('metabolites',height="600px", width = "100%")),
         tabPanel("BR Phenotype",
-
+                 
                  plotOutput('phenotype',height="600px", width = "100%")),
         tabPanel("Table", tableOutput(outputId = "table")),
         tabPanel("Back-end", )
@@ -193,8 +194,11 @@ ui <- fluidPage(
   uiOutput(outputId = "select_all"),
   uiOutput(outputId = "deselect_all"),
   uiOutput(outputId = "values"),
-  tableOutput(outputId = "show_inputs"),
-  tableOutput(outputId = "show_inputs2"),
+  fluidRow(
+    column(width = 6, tableOutput(outputId = "show_inputs")),
+    column(width = 6, tableOutput(outputId = "show_inputs2"))
+  )
+  
 )
 
 # Server logic ----
@@ -202,34 +206,117 @@ server <- function(input, output, session) {
   
   
   
-  #---------DATA SHEET IMPORT----------------------------------------------------------------------
+  #---------Data sheet import----------------------------------------------------------------------
   
   # First returns a list of dataframes corresponding to each sheet in the excel file
   
-  #filepath <- file.choose()
-  #sheetnames <- excel_sheets(filepath)
+  # observeEvent(input$browse, {
+  #     filepath <<- file.choose()
+  #     sheetnames <<- excel_sheets(filepath)
+  # })
+  # # 
   
-  observeEvent(input$load, {
+  wb <- reactiveVal()    
+  #df <- reactiveVal()
+  #new_df <- reactiveVal()
+  #filtered_data <- reactiveVal()
+  
+  observeEvent(input$browse,{
     filepath <<- file.choose()
     sheetnames <<- excel_sheets(filepath)
-  })
-  
-  data <- eventReactive(input$reload, {
     dfs <- lapply(sheetnames, function(x) read_excel(filepath,sheet=x))
     names(dfs) <- sheetnames
-    return(dfs)
+    wb(dfs)
+    
+    
+    #print(is.null(wb()))
+    #return(dfs)
   })
   
+  # #Then waits for user to select a sheet
+  
+  observe({
+    if (is.null(wb())==FALSE)
+      updateSelectInput(
+        inputId = "select_sheet",
+        label = "Select sheet",
+        choices = names(wb())
+      )
+  })
+  
+  #-------------DF() AND NEW_DF(): dataframes generated from selecting a sheet as well as multiple lineby (might be obsolete)  ----------------------------------------------------
+  
+  df <- reactive({
+    if (is.null(wb()) == FALSE) {
+      df <- wb()[[input$select_sheet]]
+      if (any(df[1,] %in% c("Character","Numeric","Integer")) == TRUE){
+        for (i in c(1:ncol(df))){
+          if (df[[1,i]] == "Integer")
+            df[[i]] =  as.integer(df[[i]])
+          else if (df[[1,i]] == "Character")
+            df[[i]] =  as.character(df[[i]])
+          else if (df[[1,i]] == "Numeric")
+            df[[i]] =  as.numeric(df[[i]])
+        }
+      }
+      df <- df[-1,]
+    }
+    return(df)
+  })
+  # 
+  # observe({
+  #     if (is.null(wb()) == FALSE) {
+  #         df <- wb()[[input$select_sheet]]
+  #         if (any(df[1,] %in% c("Character","Numeric","Integer")) == TRUE){
+  #             for (i in c(1:ncol(df))){
+  #                 if (df[[1,i]] == "Integer")
+  #                     df[[i]] =  as.integer(df[[i]])
+  #                 else if (df[[1,i]] == "Character")
+  #                     df[[i]] =  as.character(df[[i]])
+  #                 else if (df[[1,i]] == "Numeric")
+  #                     df[[i]] =  as.numeric(df[[i]])
+  #             }
+  #         }
+  #         df <- df[-1,]
+  #     }
+  #     df(df)
+  # })
+  #     
+  new_df <- reactive({
+    if (input$selectinput_line1 == "None" & input$selectinput_line2 == "None" & input$selectinput_line3 == "None") {
+      return(df())
+    }
+    else{
+      combined_line <- paste(df()[[input$selectinput_line1]],df()[[input$selectinput_line2]],df()[[input$selectinput_line3]])
+      cbind(df(),combined_line)
+    }
+  })
+  #-------------Data refresh----------------------------------------------------
+  
   #when the save button is hit, store input values as they currently are
-  current_inputs <- eventReactive(input$save,AllInputs())
-  #when restore button is hit, change AllInputs to the last saved inputs
-  observeEvent(input$restore,{
-    updateSelectInput(
-      session,
-      inputId = "select_sheet",
-      selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == "select_sheet"))[["V2"]]
+  current_inputs <- eventReactive(input$reload,isolate(AllInputs()))
+  
+  
+  #observeEvent(input$reload,print(str(current_inputs())))
+  observeEvent(input$reload,{
+    #print(str(workbook()))
+    #current_inputs <- isolate(AllInputs())
+    dfs <- lapply(sheetnames, function(x) read_excel(filepath,sheet=x))
+    names(dfs) <- sheetnames
+    wb(dfs)
+    #print(filter(current_inputs(),current_inputs()[["V1"]]=="select_sheet")[["V2"]])
+    delay(100,
+          updateSelectInput(
+            session,
+            inputId = "select_sheet",
+            selected = filter(current_inputs(),current_inputs()[["V1"]]=="select_sheet")[["V2"]]
+          )
     )
-    delay(500,
+    
+  })
+  
+  observeEvent(input$reload, {
+    delay(200,
           lapply(names(input), function(i) {
             if (grepl("selectinput",i,fixed=TRUE)) {
               updateSelectInput(
@@ -238,28 +325,20 @@ server <- function(input, output, session) {
                 selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == i))[["V2"]]
               )
             }
-              if (grepl("filter",i,fixed=TRUE)) {
-                updateSelectInput(
-                  session,
-                  inputId = i,
-                  selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == i))[["V2"]]
-                )
-              }
-              # if (grepl("options",i,fixed=TRUE)) {
-              #   updateCheckboxGroupInput(
-              #     session,
-              #     inputId = i,
-              #     #choices = na.omit(unique(filter_values(i,new_df())[[input[[paste0("filter",i)]]]])),
-              #     selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == i))[["V2"]],
-              #   )
-              # }
+            if (grepl("filter",i,fixed=TRUE)) {
+              updateSelectInput(
+                session,
+                inputId = i,
+                selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == i))[["V2"]]
+              )
             }
+          }
           )
     )
   })
   
-  observeEvent(input$restore,{
-    delay(1000,
+  observeEvent(input$reload,{
+    delay(500,
           lapply(names(input), function(i) {
             if (grepl("options",i,fixed=TRUE)) {
               updateCheckboxGroupInput(
@@ -274,14 +353,6 @@ server <- function(input, output, session) {
     )
   })
   
-  #Then waits for user to select a sheet
-  observeEvent(input$reload,{
-      updateSelectInput(
-        inputId = "select_sheet",
-        label = "Select sheet",
-        choices = names(data())
-      )
-  })
   
   #---Input boxes for selecting axes--------
   observe({
@@ -327,36 +398,8 @@ server <- function(input, output, session) {
     )
   })
   
-  #-------------DF() AND NEW_DF(): dataframes generated from selecting a sheet as well as multiple lineby (might be obsolete)  ----------------------------------------------------
+  #-------AllInputs table for storing inputs to restore during data refresh---------
   
-  df <- reactive({
-    if (is.null(data()) == FALSE)
-      df <- data()[[input$select_sheet]]
-    if (any(df[1,] %in% c("Character","Numeric","Integer")) == TRUE)
-      for (i in c(1:ncol(df))){
-              if (df[[1,i]] == "Integer")
-                df[[i]] =  as.integer(df[[i]])
-              else if (df[[1,i]] == "Character")
-                df[[i]] =  as.character(df[[i]])
-              else if (df[[1,i]] == "Numeric")
-                df[[i]] =  as.numeric(df[[i]])
-            }
-      df <- df[-1,]
-    return(df)
-  })
-  
-  new_df <- reactive({
-    if (input$selectinput_line1 == "None" & input$selectinput_line2 == "None" & input$selectinput_line3 == "None") {
-      return(df())
-    }
-    else{
-      combined_line <- paste(df()[[input$selectinput_line1]],df()[[input$selectinput_line2]],df()[[input$selectinput_line3]])
-      cbind(df(),combined_line)
-    }
-  })
-  
-  #-------DATAFRAME ALLINPUTS FOR REMEMBERING USER SELECTIONS WHEN ADDING NEW selectinput_filterS---------
-  counter <- reactiveValues(n = 0)
   # Track all user inputs
   AllInputs <- reactive({
     myvalues <- NULL
@@ -368,8 +411,8 @@ server <- function(input, output, session) {
     myvalues
   })
   
-  #---------ADD/REMOVE FILTER BUTTONS----------------------------------------------------------------------
-  
+  #---------Add/remove filter buttons----------------------------------------------------------------------
+  counter <- reactiveValues(n = 0)
   observeEvent(input$add_btn, {
     counter$n <- counter$n + 1
     
@@ -378,7 +421,7 @@ server <- function(input, output, session) {
     if (counter$n > 0) counter$n <- counter$n - 1
   })
   
-  #---------FILTER OPTIONS----------------------------------------------------------------------
+  #---------Filter options----------------------------------------------------------------------
   
   
   filters <- reactive({
@@ -396,7 +439,7 @@ server <- function(input, output, session) {
     }
   })
   
-  #---------VALUES FOR FILTER CHECKBOX---------------------------------------------------------------------------
+  #---------Filter checkbox values---------------------------------------------------------------------------
   
   #Helper function - loops through all filters and filters new_df by them all-----
   filter_values <- function(n,df) {
@@ -440,8 +483,8 @@ server <- function(input, output, session) {
       })
     }
   })
-
-  #---------SELECT ALL AND DESELECT ALL BUTTONS---------------------------------------------------------------------------
+  
+  #---------Select and deselect all filter buttons---------------------------------------------------------------------------
   
   select_all <- reactive({
     n <- counter$n
@@ -503,20 +546,20 @@ server <- function(input, output, session) {
     }
   })
   
+  #-----Filtered dataframe - this is what ends up getting plotted-------
+  
   filtered_data <- reactive({
     n <- counter$n
     holder <- new_df()
     if (n == 0) {
-      return(holder)
+      return(new_df())
     }
-    
     else {
       for (i in seq_len(n)) {
         if (input[[paste0("filter",i)]] != "") {
-          holder <- filter(holder,holder[[input[[paste0("filter",i)]]]] %in% input[[paste0("options",i)]])
+          return(filter(new_df(),new_df()[[input[[paste0("filter",i)]]]] %in% input[[paste0("options",i)]]))
         }
       }
-      return(holder)
     }
   })
   
@@ -562,7 +605,7 @@ server <- function(input, output, session) {
     y_max_def <- ggplot_build(plt)$layout$panel_params[[1]]$y.range[[2]]
     list(x_min_def,x_max_def,y_min_def,y_max_def)
   }
-
+  
   output$scatter <- renderPlot({
     req(input$refresh)
     isolate({
@@ -581,7 +624,7 @@ server <- function(input, output, session) {
       else y_max <- default_ranges(p)[[4]]
       
       p <- p+coord_cartesian(xlim = c(x_min,x_max),ylim=c(y_min,y_max))
-        
+      
       if (is.integer(filtered_data()[[input$selectinput_x]]) == TRUE){
         p <- p + scale_x_continuous(breaks = integer_breaks())
       }
@@ -589,25 +632,25 @@ server <- function(input, output, session) {
       else if (is.numeric(filtered_data()[[input$selectinput_x]])){
         p <- p + scale_x_continuous(breaks = scales::pretty_breaks(n = 10))
       }
-
+      
       if (is.numeric(filtered_data()[[input$selectinput_y]]) == TRUE)
         p <- p + scale_y_continuous(breaks = scales::pretty_breaks(n = 10))
       return(p)
-      }
-      )
-      })
+    }
+    )
+  })
   
-
+  
   growth_plots <- list(
-                        "Viable Count (e6/mL)",
-                      "% Viability",
-                      "NC-200 Fold Expansion"
-                      )
+    "Viable Count (e6/mL)",
+    "% Viability",
+    "NC-200 Fold Expansion"
+  )
   
   met_plots <- list(
-                       "Metaflex pH",
-                       "Metaflex Lactate (mM/L)",
-                       "Metaflex Glucose (mg/dL)"
+    "Metaflex pH",
+    "Metaflex Lactate (mM/L)",
+    "Metaflex Glucose (mg/dL)"
   )
   
   phenotype_plots <- list("DAPIneg (%)",
@@ -615,23 +658,23 @@ server <- function(input, output, session) {
                           # "NKG2A+/CD16- (%)",
                           # "NKG2A+/CD16+ (%)",
                           # "NKG2A-/CD16+ (%)"
-                          )
+  )
   
   output$growth <- renderPlot({
-      req(input$refresh)
-      isolate({
-        plots <- lapply(seq_len(length(growth_plots)),function(i){
-          if (is.null(new_df()[['combined_line']]) == FALSE)
-              p <- plot_pointswithline(data = isolate(filtered_data()), x = "Day", y = growth_plots[[i]], groupby="combined_line",colorby=isolate(input$selectinput_color),shapeby=isolate(input$selectinput_shape),panelby=isolate(input$selectinput_panel))
-          else
-              p<- plot_pointswithline(data = isolate(filtered_data()), x = "Day", y = growth_plots[[i]], groupby="NULL",colorby=isolate(input$selectinput_color),shapeby=isolate(input$selectinput_shape),panelby=isolate(input$selectinput_panel))
-          
-          p <- p + scale_x_continuous(breaks = integer_breaks())
-          p <- p + scale_y_continuous(breaks = scales::pretty_breaks(n = 10))
-        })
-        ggarrange(plotlist = plots, common.legend = TRUE, legend="right")
+    req(input$refresh)
+    isolate({
+      plots <- lapply(seq_len(length(growth_plots)),function(i){
+        if (is.null(new_df()[['combined_line']]) == FALSE)
+          p <- plot_pointswithline(data = isolate(filtered_data()), x = "Day", y = growth_plots[[i]], groupby="combined_line",colorby=isolate(input$selectinput_color),shapeby=isolate(input$selectinput_shape),panelby=isolate(input$selectinput_panel))
+        else
+          p<- plot_pointswithline(data = isolate(filtered_data()), x = "Day", y = growth_plots[[i]], groupby="NULL",colorby=isolate(input$selectinput_color),shapeby=isolate(input$selectinput_shape),panelby=isolate(input$selectinput_panel))
+        
+        p <- p + scale_x_continuous(breaks = integer_breaks())
+        p <- p + scale_y_continuous(breaks = scales::pretty_breaks(n = 10))
       })
+      ggarrange(plotlist = plots, common.legend = TRUE, legend="right")
     })
+  })
   
   output$metabolites <- renderPlot({
     req(input$refresh)
@@ -664,7 +707,7 @@ server <- function(input, output, session) {
       ggarrange(plotlist = plots, common.legend = TRUE, legend="right")
     })
   })
-   
+  
   # lapply(seq_len(length(list_of_plots)), function(i)
   #   output[[names(list_of_plots)[[i]]]] <- renderPlot({
   #     req(input$refresh)
@@ -680,8 +723,9 @@ server <- function(input, output, session) {
   #   })
   # )
   
-
+  
   output$table <- renderTable({
+    
     filtered_data()
   })
   
@@ -689,7 +733,7 @@ server <- function(input, output, session) {
     AllInputs()
     #default_ranges(plot_pointswithline(data = filtered_data(), x = input$x, y = input$y,groupby="combined_line",colorby=input$color))
   })
-
+  
   output$show_inputs2 <- renderTable({
     current_inputs()
   })
