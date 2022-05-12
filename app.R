@@ -13,12 +13,14 @@ library(ggpubr)
 #----QW 08/16/21 SHOWING TONS OF DATA WITH TABS
 #----QW 11/27/21 QOL changes
 #----QW 12/1/21 removed multi-step data refresh
+#----QW 12/28/21 fixed a bunch of bugs
 
 #-----helper function - for building scatter plots with line---------------
 plot_pointswithline <- function(data,x,y,groupby,colorby,shapeby,panelby){
   if (is.null(data)==FALSE)
     p <- ggplot(data,aes_string(as.name(x),as.name(y),group=groupby,color=if(colorby!="None") as.name(colorby),shape=if(shapeby!="None") as.name(shapeby))) +
       geom_point(size = 5) +
+      #scale_shape_manual(values = c(16,1)) + 
       theme_prism(
         palette = "black_and_white",
         base_size = 16
@@ -104,7 +106,7 @@ ui <- fluidPage(
       width = 9,
       br(),
       tabsetPanel(
-        tabPanel("Free Plot", 
+        tabPanel("Free Plot",
                  fluidRow(
                    br(),
                    column(3,
@@ -114,17 +116,17 @@ ui <- fluidPage(
                             choices = NULL),
                           splitLayout(
                             textInput(
-                              inputId = "x_min", 
-                              label = NULL, 
-                              value = "", 
-                              #width = "600px", 
+                              inputId = "x_min",
+                              label = NULL,
+                              value = "",
+                              #width = "600px",
                               placeholder = "X min"
                             ),
                             textInput(
-                              inputId = "x_max", 
-                              label = NULL, 
-                              value = "", 
-                              #width = "600px", 
+                              inputId = "x_max",
+                              label = NULL,
+                              value = "",
+                              #width = "600px",
                               placeholder = "X max"
                             ),
                             actionButton(
@@ -138,24 +140,24 @@ ui <- fluidPage(
                             choices = NULL),
                           splitLayout(
                             textInput(
-                              inputId = "y_min", 
-                              label = NULL, 
-                              value = "", 
-                              #width = "200px", 
+                              inputId = "y_min",
+                              label = NULL,
+                              value = "",
+                              #width = "200px",
                               placeholder = "Y min"
                             ),
                             textInput(
-                              inputId = "y_max", 
-                              label = NULL, 
-                              value = "", 
-                              #width = "200px", 
+                              inputId = "y_max",
+                              label = NULL,
+                              value = "",
+                              #width = "200px",
                               placeholder = "Y max"
                             ),
                             actionButton(
                               inputId = "reset_y",
                               label = "Default")
                           )
-                          
+
                    ),
                    column(9,plotOutput(outputId = "scatter"
                                        #height="800px"
@@ -163,13 +165,13 @@ ui <- fluidPage(
                  )
         ),
         tabPanel("BR Growth",
-                 
+
                  plotOutput('growth',height="600px", width = "100%")),
         tabPanel("BR Metabolites",
-                 
+
                  plotOutput('metabolites',height="600px", width = "100%")),
         tabPanel("BR Phenotype",
-                 
+
                  plotOutput('phenotype',height="600px", width = "100%")),
         tabPanel("Table", tableOutput(outputId = "table")),
         tabPanel("Back-end", )
@@ -233,8 +235,10 @@ server <- function(input, output, session) {
           else if (df[[1,i]] == "Numeric")
             df[[i]] =  as.numeric(df[[i]])
         }
+        df <- df[rowSums(is.na(df))!= ncol(df),]
+        df <- df[-1,]
       }
-      df <- df[-1,]
+      
     }
     return(df)
   })
@@ -245,7 +249,9 @@ server <- function(input, output, session) {
     }
     else{
       combined_line <- paste(df()[[input$selectinput_line1]],df()[[input$selectinput_line2]],df()[[input$selectinput_line3]])
+      #combined_line <- gsub("NA","",combined_line)
       cbind(df(),combined_line)
+      #print(gsub("NA","",combined_line))
     }
   })
   #-------------Data refresh----------------------------------------------------
@@ -257,7 +263,7 @@ server <- function(input, output, session) {
     dfs <- lapply(sheetnames, function(x) read_excel(filepath,sheet=x))
     names(dfs) <- sheetnames
     wb(dfs)
-    delay(100,
+    delay(0,
           updateSelectInput(
             session,
             inputId = "select_sheet",
@@ -267,7 +273,7 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$reload, {
-    delay(200,
+    delay(500,
           lapply(names(input), function(i) {
             if (grepl("selectinput",i,fixed=TRUE)) {
               updateSelectInput(
@@ -288,21 +294,21 @@ server <- function(input, output, session) {
     )
   })
   
-  observeEvent(input$reload,{
-    delay(500,
-          lapply(names(input), function(i) {
-            if (grepl("options",i,fixed=TRUE)) {
-              updateCheckboxGroupInput(
-                session,
-                inputId = i,
-                #choices = na.omit(unique(filter_values(i,new_df())[[input[[paste0("filter",i)]]]])),
-                selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == i))[["V2"]],
-              )
-            }
-          }
-          )
-    )
-  })
+  # observeEvent(input$reload,{
+  #   delay(1000,
+  #         lapply(names(input), function(i) {
+  #           if (grepl("options",i,fixed=TRUE)) {
+  #             updateCheckboxGroupInput(
+  #               session,
+  #               inputId = i,
+  #               #choices = na.omit(unique(filter_values(i,new_df())[[input[[paste0("filter",i)]]]])),
+  #               selected = (current_inputs() %>% filter(current_inputs()[["V1"]] == i))[["V2"]],
+  #             )
+  #           }
+  #         }
+  #         )
+  #   )
+  # })
   
   
   #---Input boxes for selecting axes--------
@@ -491,14 +497,16 @@ server <- function(input, output, session) {
     n <- counter$n
     holder <- new_df()
     if (n == 0) {
-      return(new_df())
+      return(holder)
     }
+    
     else {
       for (i in seq_len(n)) {
         if (input[[paste0("filter",i)]] != "") {
-          return(filter(new_df(),new_df()[[input[[paste0("filter",i)]]]] %in% input[[paste0("options",i)]]))
+          holder <- filter(holder,holder[[input[[paste0("filter",i)]]]] %in% input[[paste0("options",i)]])
         }
       }
+      return(holder)
     }
   })
   
@@ -565,11 +573,11 @@ server <- function(input, output, session) {
       p <- p+coord_cartesian(xlim = c(x_min,x_max),ylim=c(y_min,y_max))
       
       if (is.integer(filtered_data()[[input$selectinput_x]]) == TRUE){
-        p <- p + scale_x_continuous(breaks = integer_breaks())
+        p <- p + scale_x_continuous(breaks = pretty_breaks(n = 10))
       }
       
       else if (is.numeric(filtered_data()[[input$selectinput_x]])){
-        p <- p + scale_x_continuous(breaks = scales::pretty_breaks(n = 10))
+        p <- p + scale_x_continuous(breaks = integer_breaks(n=10))
       }
       
       if (is.numeric(filtered_data()[[input$selectinput_y]]) == TRUE)
@@ -584,12 +592,15 @@ server <- function(input, output, session) {
     "Viable Count (e6/mL)",
     "% Viability",
     "NC-200 Fold Expansion"
+    #"DAPIneg (%)",
+    #"ACR+/CD56+ (%)"
   )
   
   met_plots <- list(
     "Metaflex pH",
     "Metaflex Lactate (mM/L)",
-    "Metaflex Glucose (mg/dL)"
+    "Metaflex Glucose (mg/dL)",
+    "Metaflex pO2 (%)"
   )
   
   phenotype_plots <- list("DAPIneg (%)",
@@ -652,14 +663,14 @@ server <- function(input, output, session) {
   output$table <- renderTable({
     filtered_data()
   })
+  # 
+  # output$show_inputs <- renderTable({
+  #   AllInputs()
+  # })
   
-  output$show_inputs <- renderTable({
-    AllInputs()
-  })
-  
-  output$show_inputs2 <- renderTable({
-    current_inputs()
-  })
+  # output$show_inputs2 <- renderTable({
+  #   current_inputs()
+  # })
   
   output$filters <- renderUI({
     if (is.null(filters())==FALSE)
